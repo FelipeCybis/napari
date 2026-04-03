@@ -338,7 +338,7 @@ class QtDims(QWidget):
     def is_playing(self):
         """Return True if any axis is currently animated."""
         try:
-            return not self._animation_thread._waiter.is_set()
+            return self._animation_thread._playing
         except RuntimeError as e:  # pragma: no cover
             if (
                 'wrapped C/C++ object of type' not in e.args[0]

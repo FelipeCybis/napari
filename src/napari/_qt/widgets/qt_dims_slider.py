@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import threading
 from typing import TYPE_CHECKING
 from weakref import ref
 
@@ -589,7 +588,8 @@ class AnimationThread(QThread):
         super().__init__(parent=parent)
         self._interval = 1
         self._slider: ref[QtDimSliderWidget] = lambda: None
-        self._waiter = threading.Event()
+        self._playing = False
+        self._timer = None
         self.frame_range = (0, 0)
         self.dims_range = (0, 1, 1)
         self.min_point = 0
@@ -598,7 +598,46 @@ class AnimationThread(QThread):
         self.step = 1
 
     def run(self):
-        self.work()
+        """Start the QThread event loop with a PreciseTimer."""
+        from qtpy.QtCore import QTimer
+
+        # if loop_mode is once and we are already on the last frame,
+        # return to the first frame... (so the user can keep hitting once)
+        if self.loop_mode == LoopMode.ONCE:
+            if self.step > 0 and self.current >= self.max_point - 1:
+                self.frame_requested.emit(self.axis, self.min_point)
+            elif self.step < 0 and self.current <= self.min_point + 1:
+                self.frame_requested.emit(self.axis, self.max_point)
+        else:
+            # immediately advance one frame
+            self.advance()
+
+        self._playing = True
+        self._timer = QTimer()
+        self._timer.setTimerType(Qt.TimerType.PreciseTimer)
+        self._timer.timeout.connect(
+            self._on_timer, Qt.ConnectionType.DirectConnection
+        )
+        self._timer.start(int(self._interval))
+
+        self.exec()  # blocks until quit() is called from _on_timer
+
+        # Still in the animation thread — safe to clean up the timer here
+        self._timer.stop()
+        self._timer = None
+
+    def _on_timer(self):
+        """Timer callback — advance one frame and print timing."""
+        # Check if we should stop (set from main thread via _stop())
+        if not self._playing:
+            self.quit()  # exits exec(), cleanup happens after exec() returns
+            return
+
+        # Sync timer interval if fps changed from the main thread
+        if self._timer.interval() != int(self._interval):
+            self._timer.setInterval(int(self._interval))
+
+        self.advance()
 
     @property
     def slider(self) -> QtDimSliderWidget | None:
@@ -635,29 +674,15 @@ class AnimationThread(QThread):
     @interval.setter
     def interval(self, value):
         self._interval = value
-
-    @Slot()
-    def work(self):
-        """Play the animation."""
-        # if loop_mode is once and we are already on the last frame,
-        # return to the first frame... (so the user can keep hitting once)
-        if self.loop_mode == LoopMode.ONCE:
-            if self.step > 0 and self.current >= self.max_point - 1:
-                self.frame_requested.emit(self.axis, self.min_point)
-            elif self.step < 0 and self.current <= self.min_point + 1:
-                self.frame_requested.emit(self.axis, self.max_point)
-        else:
-            # immediately advance one frame
-            self.advance()
-        self._waiter.clear()
-        self._waiter.wait(self.interval / 1000)
-        while not self._waiter.is_set():
-            self.advance()
-            self._waiter.wait(self.interval / 1000)
+        # Don't touch the timer here — it lives in the animation thread.
+        # _on_timer will pick up the new interval on its next tick.
 
     def _stop(self):
         """Stop the animation."""
-        self._waiter.set()
+        # Just set the flag. _on_timer (running in the animation thread)
+        # will see it and stop the timer + quit the event loop from the
+        # correct thread.
+        self._playing = False
 
     @Slot(float)
     def set_fps(self, fps):
