@@ -1,0 +1,15 @@
+{
+    "trace_qt_events": true,
+    "trace_file_on_start": "latest.json",
+    "trace_callables": ["animation"],
+    "callable_lists": {
+        "animation": [
+            "napari._qt.widgets.qt_dims_slider.AnimationThread.advance",
+            "napari._qt.widgets.qt_dims_slider.AnimationThread.run",
+            "napari._qt.widgets.qt_dims.QtDims._set_frame",
+            "napari.components.dims.Dims.set_current_step",
+            "napari._vispy.canvas.VispyCanvas.on_draw",
+            "napari._vispy.canvas.VispyCanvas.enable_dims_play"
+        ]
+    }
+}

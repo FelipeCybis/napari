@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+import time
 from typing import TYPE_CHECKING
 from weakref import ref
 
@@ -653,7 +654,11 @@ class AnimationThread(QThread):
         self._waiter.wait(self.interval / 1000)
         while not self._waiter.is_set():
             self.advance()
+            start_wait = time.time()
             self._waiter.wait(self.interval / 1000)
+            print(
+                f'Waited {(time.time() - start_wait):.3f} seconds | FPS: {(1 / (time.time() - start_wait)):.2f}'
+            )
 
     def _stop(self):
         """Stop the animation."""
