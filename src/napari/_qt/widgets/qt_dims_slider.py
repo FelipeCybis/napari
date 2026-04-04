@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING
 from weakref import ref
 
@@ -612,6 +613,7 @@ class AnimationThread(QThread):
             # immediately advance one frame
             self.advance()
 
+        self._last_advance = time.time()
         self._playing = True
         self._timer = QTimer()
         self._timer.setTimerType(Qt.TimerType.PreciseTimer)
@@ -624,7 +626,6 @@ class AnimationThread(QThread):
 
         # Still in the animation thread — safe to clean up the timer here
         self._timer.stop()
-        self._timer = None
 
     def _on_timer(self):
         """Timer callback — advance one frame and print timing."""
@@ -638,6 +639,11 @@ class AnimationThread(QThread):
             self._timer.setInterval(int(self._interval))
 
         self.advance()
+        since_last = time.time() - self._last_advance
+        self._last_advance = time.time()
+        print(
+            f'Imposed FPS: {self.slider.fps:.2f} | Waited {since_last:.3f} seconds | FPS: {(1 / since_last):.2f}'
+        )
 
     @property
     def slider(self) -> QtDimSliderWidget | None:
