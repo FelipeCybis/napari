@@ -657,7 +657,7 @@ class AnimationThread(QThread):
             start_wait = time.time()
             self._waiter.wait(self.interval / 1000)
             print(
-                f'Waited {(time.time() - start_wait):.3f} seconds | FPS: {(1 / (time.time() - start_wait)):.2f}'
+                f'Imposed FPS: {self.slider.fps:.2f} | Waited {(time.time() - start_wait):.3f} seconds | FPS: {(1 / (time.time() - start_wait)):.2f}'
             )
 
     def _stop(self):
