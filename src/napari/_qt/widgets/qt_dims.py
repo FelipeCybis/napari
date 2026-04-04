@@ -11,6 +11,7 @@ from napari._qt.widgets.qt_dims_slider import (
 from napari.components.dims import Dims
 from napari.settings._constants import LoopMode
 from napari.utils.translations import trans
+import time
 
 
 class QtDims(QWidget):
@@ -316,6 +317,7 @@ class QtDims(QWidget):
             )
             self._animation_thread.set_slider(self.slider_widgets[axis])
             self._animation_thread.frame_requested.connect(self._set_frame)
+            self._set_frame_timing = time.time()
             if not self._animation_thread.isRunning():
                 self._animation_thread.start()
             else:
@@ -359,6 +361,11 @@ class QtDims(QWidget):
         the effective frame rate constant even if the canvas cannot keep up.
         """
         if self.dims._play_ready:
+            since_last = time.time() - self._set_frame_timing
+            self._set_frame_timing = time.time()
+            print(
+                f'Waited {since_last:.3f} seconds | Effective FPS: {(1 / since_last):.2f}'
+            )
             # disable additional point advance requests until this one draws
             self.dims._play_ready = False
             self.dims.set_current_step(axis, frame)
