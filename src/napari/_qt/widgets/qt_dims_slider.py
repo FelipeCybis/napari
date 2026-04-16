@@ -597,6 +597,12 @@ class AnimationThread(QThread):
         self.max_point = 1
         self.current = 0
         self.step = 1
+        # Optional timing buffers for benchmarking. When set to a list,
+        # work() (imposed) and QtDims._set_frame (effective) will append
+        # (requested_fps, interval_seconds) tuples. Default None => disabled
+        # and zero overhead. See tools/benchmark_animation_fps.py.
+        self._imposed_log: list[tuple[float, float]] | None = None
+        self._effective_log: list[tuple[float, float]] | None = None
 
     def run(self):
         self.work()
@@ -650,15 +656,19 @@ class AnimationThread(QThread):
         else:
             # immediately advance one frame
             self.advance()
+        self._last_advance = time.time()
         self._waiter.clear()
         self._waiter.wait(self.interval / 1000)
         while not self._waiter.is_set():
             self.advance()
-            start_wait = time.time()
+            now = time.time()
+            since_last = now - self._last_advance
+            self._last_advance = now
+            if self._imposed_log is not None:
+                slider = self.slider
+                requested = slider.fps if slider is not None else 0.0
+                self._imposed_log.append((requested, since_last))
             self._waiter.wait(self.interval / 1000)
-            print(
-                f'Imposed FPS: {self.slider.fps:.2f} | Waited {(time.time() - start_wait):.3f} seconds | FPS: {(1 / (time.time() - start_wait)):.2f}'
-            )
 
     def _stop(self):
         """Stop the animation."""
