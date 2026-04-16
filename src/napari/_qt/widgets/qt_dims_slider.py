@@ -597,6 +597,12 @@ class AnimationThread(QThread):
         self.max_point = 1
         self.current = 0
         self.step = 1
+        # Optional timing buffers for benchmarking. When set to a list,
+        # _on_timer (imposed) and QtDims._set_frame (effective) will append
+        # (requested_fps, interval_seconds) tuples. Default None => disabled
+        # and zero overhead. See tools/benchmark_animation_fps.py.
+        self._imposed_log: list[tuple[float, float]] | None = None
+        self._effective_log: list[tuple[float, float]] | None = None
 
     def run(self):
         """Start the QThread event loop with a PreciseTimer."""
@@ -639,11 +645,13 @@ class AnimationThread(QThread):
             self._timer.setInterval(int(self._interval))
 
         self.advance()
-        since_last = time.time() - self._last_advance
-        self._last_advance = time.time()
-        print(
-            f'Imposed FPS: {self.slider.fps:.2f} | Waited {since_last:.3f} seconds | FPS: {(1 / since_last):.2f}'
-        )
+        now = time.time()
+        since_last = now - self._last_advance
+        self._last_advance = now
+        if self._imposed_log is not None:
+            slider = self.slider
+            requested = slider.fps if slider is not None else 0.0
+            self._imposed_log.append((requested, since_last))
 
     @property
     def slider(self) -> QtDimSliderWidget | None:
